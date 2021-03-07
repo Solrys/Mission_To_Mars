@@ -1,229 +1,135 @@
-# Import Dependecies 
-from bs4 import BeautifulSoup 
+# Import Splinter, BeautifulSoup, and Pandas
 from splinter import Browser
-import pandas as pd 
-import requests 
+from bs4 import BeautifulSoup as soup
+from webdriver_manager.chrome import ChromeDriverManager
+import pandas as pd
+import datetime as dt
+import time
 
-# Initialize browser
-def init_browser(): 
-    # Replace the path with your actual path to the chromedriver
 
-    #Mac Users
-    #executable_path = {'executable_path': '/usr/local/bin/chromedriver'}
-    #return Browser('chrome', **executable_path, headless=False)
+def scrape_all():
+    # Initiate headless driver for deployment
+    executable_path = {'executable_path': ChromeDriverManager().install()}
+    browser = Browser('chrome', **executable_path, headless=False)
 
-    #Windows Users
-    # executable_path = {'executable_path': '/Users/cantu/Desktop/Mission-to-Mars'}
-    # return Browser('chrome', **executable_path, headless=False)
-    exec_path = {'executable_path': '/app/.chromedriver/bin/chromedriver'}
-    return Browser('chrome', headless=True, **exec_path)
+    news_title, news_paragraph = mars_news(browser)
+    # Run all scraping functions and store results in a dictionary
+    data = {
+        "news_title": news_title,
+        "news_paragraph": news_paragraph,
+        "featured_image": featured_image(browser), 
+        "hemisphere_images": hemisphere_images(browser),
+        "facts": mars_facts(),
+        "last_modified": dt.datetime.now()
+    }
+    # Stop webdriver and return data
+    browser.quit()
+    return data
 
-# Create Mission to Mars global dictionary that can be imported into Mongo
-mars_info = {}
 
-# NASA MARS NEWS
-def scrape_mars_news():
-    try: 
+def mars_news(browser):
 
-        # Initialize browser 
-        browser = init_browser()
+    # Scrape Mars News
+    # Visit the mars nasa news site
+    url = 'https://mars.nasa.gov/news/'
+    browser.visit(url)
 
-        #browser.is_element_present_by_css("div.content_title", wait_time=1)
+    # Optional delay for loading the page
+    browser.is_element_present_by_css("ul.item_list li.slide", wait_time=1)
 
-        # Visit Nasa news url through splinter module
-        url = 'https://mars.nasa.gov/news/'
+    # Convert the browser html to a soup object and then quit the browser
+    html = browser.html
+    news_soup = soup(html, 'html.parser')
+
+    # Add try/except for error handling
+    try:
+        slide_elem = news_soup.select_one("ul.item_list li.slide")
+        # Use the parent element to find the first 'a' tag and save it as 'news_title'
+        news_title = slide_elem.find("div", class_="content_title").get_text()
+        # Use the parent element to find the paragraph text
+        news_p = slide_elem.find("div", class_="article_teaser_body").get_text()
+
+    except AttributeError:
+        return None, None
+
+    return news_title, news_p
+
+
+def featured_image(browser):
+    # Visit URL
+    try:
+        #PREFIX = "https://web.archive.org/web/20181114023740"
+        #url = f'{PREFIX}/https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars'
+        #browser.visit(url)
+        #article = browser.find_by_tag('article').first['style']
+        #article_background = article.split("_/")[1].replace('");',"")
+        #return f'{PREFIX}_if/{article_background}'
+        url = 'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/index.html'
         browser.visit(url)
 
-        # HTML Object
+        full_image_elem = browser.find_by_tag('button')[1]
+        full_image_elem.click()
+        
         html = browser.html
-
-        # Parse HTML with Beautiful Soup
-        soup = BeautifulSoup(html, 'html.parser')
-
-
-        # Retrieve the latest element that contains news title and news_paragraph
-        news_title = soup.find('div', class_='content_title').find('a').text
-        news_p = soup.find('div', class_='article_teaser_body').text
-
-        # Dictionary entry from MARS NEWS
-        mars_info['news_title'] = news_title
-        mars_info['news_paragraph'] = news_p
-
-        return mars_info
-
-    finally:
-
-        browser.quit()
-
-# FEATURED IMAGE
-def scrape_mars_image():
-
-    try: 
-
-        # Initialize browser 
-        browser = init_browser()
-
-        #browser.is_element_present_by_css("img.jpg", wait_time=1)
-
-        # Visit Mars Space Images through splinter module
-        image_url_featured = 'https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars'
-        browser.visit(image_url_featured)# Visit Mars Space Images through splinter module
-
-        # HTML Object 
-        html_image = browser.html
-
-        # Parse HTML with Beautiful Soup
-        soup = BeautifulSoup(html_image, 'html.parser')
-
-        # Retrieve background-image url from style tag 
-        featured_image_url  = soup.find('article')['style'].replace('background-image: url(','').replace(');', '')[1:-1]
-
-        # Website Url 
-        main_url = 'https://www.jpl.nasa.gov'
-
-        # Concatenate website url with scrapped route
-        featured_image_url = main_url + featured_image_url
-
-        # Display full link to featured image
-        featured_image_url 
-
-        # Dictionary entry from FEATURED IMAGE
-        mars_info['featured_image_url'] = featured_image_url 
+        img_soup = soup(html, 'html.parser')
         
-        return mars_info
-    finally:
-
-        browser.quit()
-
+        img_url_rel = img_soup.find('img', class_='fancybox-image').get('src')
+        img_url_rel
         
+        img_url = f'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/{img_url_rel}'
+        img_url
 
-# Mars Weather 
-def scrape_mars_weather():
+        return img_url
+    except:
+        return 'https://www.nasa.gov/sites/default/files/styles/full_width_feature/public/thumbnails/image/pia22486-main.jpg'
+ 
 
-    try: 
+def mars_facts():
+    # Add try/except for error handling
+    try:
+        # Use 'read_html' to scrape the facts table into a dataframe
+        df = pd.read_html('http://space-facts.com/mars/')[0]
 
-        # Initialize browser 
-        browser = init_browser()
+    except BaseException:
+        return None
 
-        #browser.is_element_present_by_css("div", wait_time=1)
+    # Assign columns and set index of dataframe
+    df.columns=['Description', 'Mars']
+    df.set_index('Description', inplace=True)
 
-        # Visit Mars Weather Twitter through splinter module
-        weather_url = 'https://twitter.com/marswxreport?lang=en'
-        browser.visit(weather_url)
+    # Convert dataframe into HTML format, add bootstrap
+    return df.to_html(classes="table table-striped")
 
-        # HTML Object 
-        html_weather = browser.html
+def hemisphere_images(browser):
 
-        # Parse HTML with Beautiful Soup
-        soup = BeautifulSoup(html_weather, 'html.parser')
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)
+    time.sleep(1)
 
-        # Find all elements that contain tweets
-        latest_tweets = soup.find_all('div', class_='js-tweet-text-container')
+    html = browser.html
+    soups = soup(html, "lxml")
 
-        # Retrieve all elements that contain news title in the specified range
-        # Look for entries that display weather related words to exclude non weather related tweets 
-        for tweet in latest_tweets: 
-            weather_tweet = tweet.find('p').text
-            if 'Sol' and 'pressure' in weather_tweet:
-                print(weather_tweet)
-                break
-            else: 
-                pass
+    img_divs = soups.find_all("div", class_ = "description")
 
-        # Dictionary entry from WEATHER TWEET
-        mars_info['weather_tweet'] = weather_tweet
-        
-        return mars_info
-    finally:
+    hemisphere_image_urls = []
 
-        browser.quit()
+    base_url = "https://astrogeology.usgs.gov"
+    for img_div in img_divs:
+        img_info = {}
+        img_title = img_div.find("h3").text
+        img_info["title"] = img_title
+        partial_img_url = img_div.find("a", class_ = "itemLink product-item")["href"]
+        full_img_url = base_url + partial_img_url
+        browser.visit(full_img_url)
+        full_img_url = browser.html
+        soups = soup(full_img_url, "lxml")
+        img_url = soups.find("div", class_ = "downloads").li.a["href"]    
+        img_info["img_url"]=img_url
+        hemisphere_image_urls.append(img_info)
 
+    return hemisphere_image_urls 
 
-# Mars Facts
-def scrape_mars_facts():
+if __name__ == "__main__":
 
-    # Visit Mars facts url 
-    facts_url = 'http://space-facts.com/mars/'
-
-    # Use Panda's `read_html` to parse the url
-    mars_facts = pd.read_html(facts_url)
-
-    # Find the mars facts DataFrame in the list of DataFrames as assign it to `mars_df`
-    mars_df = mars_facts[0]
-
-    # Assign the columns `['Description', 'Value']`
-    mars_df.columns = ['Description','Value']
-
-    # Set the index to the `Description` column without row indexing
-    mars_df.set_index('Description', inplace=True)
-
-    # Save html code to folder Assets
-    data = mars_df.to_html()
-
-    # Dictionary entry from MARS FACTS
-    mars_info['mars_facts'] = data
-
-    return mars_info
-
-
-# MARS HEMISPHERES
-
-
-def scrape_mars_hemispheres():
-
-    try: 
-
-        # Initialize browser 
-        browser = init_browser()
-
-        # Visit hemispheres website through splinter module 
-        hemispheres_url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
-        browser.visit(hemispheres_url)
-
-        # HTML Object
-        html_hemispheres = browser.html
-
-        # Parse HTML with Beautiful Soup
-        soup = BeautifulSoup(html_hemispheres, 'html.parser')
-
-        # Retreive all items that contain mars hemispheres information
-        items = soup.find_all('div', class_='item')
-
-        # Create empty list for hemisphere urls 
-        hiu = []
-
-        # Store the main_ul 
-        hemispheres_main_url = 'https://astrogeology.usgs.gov' 
-
-        # Loop through the items previously stored
-        for i in items: 
-            # Store title
-            title = i.find('h3').text
-            
-            # Store link that leads to full image website
-            partial_img_url = i.find('a', class_='itemLink product-item')['href']
-            
-            # Visit the link that contains the full image website 
-            browser.visit(hemispheres_main_url + partial_img_url)
-            
-            # HTML Object of individual hemisphere information website 
-            partial_img_html = browser.html
-            
-            # Parse HTML with Beautiful Soup for every individual hemisphere information website 
-            soup = BeautifulSoup( partial_img_html, 'html.parser')
-            
-            # Retrieve full image source 
-            img_url = hemispheres_main_url + soup.find('img', class_='wide-image')['src']
-            
-            # Append the retreived information into a list of dictionaries 
-            hiu.append({"title" : title, "img_url" : img_url})
-
-        mars_info['hiu'] = hiu
-
-        
-        # Return mars_data dictionary 
-
-        return mars_info
-    finally:
-
-        browser.quit()
+    # If running as script, print scraped data
+    print(scrape_all())
