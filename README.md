@@ -28,5 +28,15 @@ With the code I wrote I will be able to pull a great image, the most recent news
 
 ## Results
 This is what the index.html page looks like before we activate the scrape button. 
-![scrape]
+![scrape](https://github.com/Solrys/Mission_To_Mars/blob/main/images/Screen%20Shot%202021-03-07%20at%209.34.56%20AM.png)
+
+## Final Website
+After modifying the code the folowing adjustments were made
+1) added class
+2) updated the color of the scrape button to green
+3) added a divider line <hr class="my-4">
+4) converted images into thumbnails
+5) I spaced out the hemisphere images using code  <div class="col-xs-6 col-sm-3"> 
+
+
 
