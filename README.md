@@ -23,5 +23,10 @@ I needed a database that works differently from SQL with its neatly ordered tabl
 
 With the code I wrote I will be able to pull a great image, the most recent news article summary, and even an HTML table. Compared to SQL's orderly relational system, where each table is linked to at least one other by a key, the data we've helped Robin gather is a bit chaotic. This is where a non-relational database comes in.
 
+### Mongo Database
 ![mongo](https://github.com/Solrys/Mission_To_Mars/blob/main/images/MongoDB.PNG.png)
+
+## Results
+This is what the index.html page looks like before we activate the scrape button. 
+![scrape]
 
